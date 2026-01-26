@@ -1,0 +1,14 @@
+{
+  "files": {
+    "main.css": "/HappyAuto/static/css/main.fa0cc52a.css",
+    "main.js": "/HappyAuto/static/js/main.da2b2719.js",
+    "static/media/autoBg.png": "/HappyAuto/static/media/autoBg.c77046ea12a70d8c63c3.png",
+    "index.html": "/HappyAuto/index.html",
+    "main.fa0cc52a.css.map": "/HappyAuto/static/css/main.fa0cc52a.css.map",
+    "main.da2b2719.js.map": "/HappyAuto/static/js/main.da2b2719.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.fa0cc52a.css",
+    "static/js/main.da2b2719.js"
+  ]
+}
