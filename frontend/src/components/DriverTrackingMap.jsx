@@ -244,6 +244,9 @@ export default function DriverTrackingMap({ pickup, dropoff }) {
         mapRef.current.remove();
         mapRef.current = null;
       }
+
+      pickupRef.current = null;
+      dropoffRef.current = null;
     };
   }, []);
 
@@ -258,7 +261,16 @@ export default function DriverTrackingMap({ pickup, dropoff }) {
     const dLat = parseFloat(dropoff?.lat);
     const dLng = parseFloat(dropoff?.lng);
 
-    if (!pLat || !pLng || !dLat || !dLng) return;
+    // if (!pLat || !pLng || !dLat || !dLng) return; changed for recent delivery section
+
+    if (
+      Number.isNaN(pLat) ||
+      Number.isNaN(pLng) ||
+      Number.isNaN(dLat) ||
+      Number.isNaN(dLng)
+    ) {
+      return;
+    }
 
     // --- UPDATE PICKUP MARKER ---
     if (!pickupRef.current) {
@@ -278,22 +290,48 @@ export default function DriverTrackingMap({ pickup, dropoff }) {
 
     // --- AUTO-CENTER & FIT BOUNDS ---
     // We use requestAnimationFrame to ensure Leaflet has rendered the markers first
-    requestAnimationFrame(() => {
-        const bounds = L.latLngBounds(
-          [pLat, pLng], 
-          [dLat, dLng]
-        );
+    // requestAnimationFrame(() => {
+    //     if (!mapRef.current) return;
 
-        mapRef.current.fitBounds(bounds, { 
-          padding: [50, 50],
-          maxZoom: 15 
-        });
         
-        // Final size check to ensure map is visible in the card
-        setTimeout(() => {
-            mapRef.current?.invalidateSize();
-        }, 100);
-    });
+
+    //     const bounds = L.latLngBounds(
+    //       [pLat, pLng], 
+    //       [dLat, dLng]
+    //     );
+
+    //     mapRef.current.fitBounds(bounds, {
+    //       padding: [60, 60],
+    //       maxZoom: 15,
+    //       animate: true,
+    //     });
+        
+    //     // Final size check to ensure map is visible in the card
+    //     setTimeout(() => {
+    //         mapRef.current?.invalidateSize();
+    //     }, 100);
+    // });
+
+    // --- AUTO-CENTER & FIT BOUNDS ---
+    setTimeout(() => {
+      if (!mapRef.current) return;
+
+      // 🔥 CRITICAL: fix container size first
+      mapRef.current.invalidateSize();
+
+      const bounds = L.latLngBounds(
+        [pLat, pLng],
+        [dLat, dLng]
+      );
+
+      mapRef.current.fitBounds(bounds, {
+        padding: [60, 60],
+        maxZoom: 15,
+        animate: true,
+      });
+
+    }, 150);
+
 
   }, [pickup, dropoff]);
 

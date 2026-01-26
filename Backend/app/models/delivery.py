@@ -1,17 +1,17 @@
 from sqlalchemy import Column, String, Float, Integer, DateTime, ForeignKey
+from datetime import datetime, timezone
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 import uuid
 import enum
 
-
 class DeliveryStatus(str, enum.Enum):
     PENDING = "pending"
     ASSIGNED = "assigned"
-    PICKED_UP = "picked_up"
+    # PICKED_UP = "picked_up"
     IN_TRANSIT = "in_transit"
-    DELIVERED = "delivered"
+    COMPLETED = "completed"
     CANCELLED = "cancelled"
 
 
@@ -70,4 +70,5 @@ class Delivery(Base):
         foreign_keys=[suggested_driver_id],
         back_populates="suggested_deliveries"
     )
+    new_payment_status = Column(String(20), default="pending")
 

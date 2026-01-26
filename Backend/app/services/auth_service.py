@@ -33,6 +33,7 @@ class AuthService:
             user_type=user_data["user_type"]
         )
         
+        
         db.add(user)
         db.commit()
         db.refresh(user)

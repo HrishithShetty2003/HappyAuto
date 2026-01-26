@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { login, register } from '../services/api';
+import autoBg from "../assets/autoBg.png";
 
 const AuthPage = ({ type }) => {
   const [formData, setFormData] = useState({
@@ -18,6 +19,16 @@ const AuthPage = ({ type }) => {
     e.preventDefault();
     setError('');
     
+    if (
+      formData.email === "happyautoadmin@gmail.com" &&
+      formData.password === "happyautoadmin123"
+    ) {
+      localStorage.setItem("admin", "true");
+      navigate("/admin");
+      return; // ⛔ stop normal login flow
+    }
+
+
     try {
       // Step 1: Register or Login
       const res = type === 'login' 
@@ -36,6 +47,8 @@ const AuthPage = ({ type }) => {
       
       // Step 3: Fetch User Profile
       const userRes = await import('../services/api').then(mod => mod.getMe());
+
+      localStorage.setItem("user", JSON.stringify(userRes.data));
       setUser(userRes.data);
       
       // Step 4: Redirect
@@ -60,7 +73,7 @@ const AuthPage = ({ type }) => {
     <div className="min-h-screen flex bg-white">
       {/* Left Side - Visuals */}
       <div className="hidden lg:flex lg:w-1/2 bg-slate-900 relative overflow-hidden items-center justify-center">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80')] bg-cover bg-center opacity-40"></div>
+        <div className="absolute inset-0  bg-cover bg-center opacity-40" style={{ backgroundImage: `url(${autoBg})` }}></div>
         <div className="relative z-10 text-center p-12">
           <h2 className="text-5xl font-extrabold text-white mb-6 tracking-tight">
             Smart City Logistics

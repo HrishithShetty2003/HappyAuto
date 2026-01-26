@@ -1,11 +1,12 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import api_router
+from app.api import admin
 from app.core.database import create_tables
 from app.models import user, driver, customer, delivery  # ensure models are loaded
 import json
 
-create_tables()
+
 
 # WebSocket Connection Manager
 class ConnectionManager:
@@ -45,12 +46,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
+@app.on_event("startup")
+def on_startup():
+    create_tables()
+    print("✅ Database tables created!")
+
 # CORS setup (keep your existing code)
 origins = [
     "http://localhost:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3000"
 ]
 
 
@@ -63,6 +67,8 @@ app.add_middleware(
 )
 # Include API routes
 app.include_router(api_router)
+app.include_router(admin.router)
+
 
 # WebSocket endpoint
 @app.websocket("/ws/{user_id}")
@@ -169,3 +175,5 @@ def book_delivery(data: dict):
         "eta": "15 minutes",
         "booking_id": "BOOK_" + str(hash(driver_name))[:8]
     }
+
+

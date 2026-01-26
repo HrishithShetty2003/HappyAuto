@@ -20,6 +20,8 @@ def get_current_user_dep(
     db: Session = Depends(get_db),
     token: str = Depends(oauth2_scheme)
 ):
+    print("🔥 TOKEN RECEIVED:", token)
+    user, error = AuthService.get_current_user(db, token)
     user, error = AuthService.get_current_user(db, token)
     if error or not user:
         raise HTTPException(
@@ -206,3 +208,4 @@ def update_profile(
     db.refresh(current_user)
 
     return {"success": True}
+

@@ -28,6 +28,7 @@ class DeliveryCreate(BaseModel):
 class AssignedDriver(BaseModel):
     name: str
     vehicle_number: Optional[str] = None
+    phone: str | None = None
 
 class DeliveryResponse(BaseModel):
     id: str
@@ -45,8 +46,10 @@ class DeliveryResponse(BaseModel):
     estimated_time: Optional[float]
     estimated_cost: Optional[float]
     created_at: datetime
-    assigned_driver: Optional[AssignedDriver] = None
+    assigned_driver: AssignedDriver | None = None
     customer: CustomerInfo | None
+    new_payment_status: Optional[str] = "pending"
+
     
 class Config:
     from_attributes = True

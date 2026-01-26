@@ -2,6 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
+import os
 
 # Create engine
 engine = create_engine(
@@ -9,6 +10,9 @@ engine = create_engine(
     pool_pre_ping=True,
     echo=True  # Set to False in production
 )
+
+print("🔥 USING DB:", os.path.abspath("happyauto.db"))
+
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

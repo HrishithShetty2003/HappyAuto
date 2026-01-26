@@ -1,9 +1,10 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: process.env.REACT_APP_API_URL,
-  headers: { 'Content-Type': 'application/json' },
+  baseURL: "http://127.0.0.1:8000",
+  headers: { "Content-Type": "application/json" },
 });
+
 
 // Attach token to every request
 API.interceptors.request.use(
@@ -16,6 +17,7 @@ API.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
+console.log("🔥 API BASE URL =", process.env.REACT_APP_API_URL);
 
 export default API;
 
@@ -28,6 +30,11 @@ export const getMe = () => API.get('/api/v1/auth/me');
 export const bookDelivery = (data) => API.post('/api/v1/deliveries/book', data);
 export const getMyDeliveries = () => API.get('/api/v1/deliveries/my-deliveries');
 export const getUnassigned = () => API.get('/api/v1/deliveries/unassigned');
+export const getCompletedDeliveries = () =>
+  API.get("/api/v1/deliveries/completed");
+export const getDriverCompletedDeliveries = () =>
+  API.get("/api/v1/deliveries/driver/completed");
+
 
 // --- Driver Actions ---
 export const acceptDelivery = (id) => API.post(`/api/v1/deliveries/${id}/accept`);
@@ -35,3 +42,4 @@ export const startTrip = (id) => API.post(`/api/v1/deliveries/${id}/start`);
 export const completeTrip = (id) => API.post(`/api/v1/deliveries/${id}/complete`);
 export const updateDriverStatus = (data) => API.put('/api/v1/deliveries/driver/status', data);
 export const updateDriverLocation = (data) => API.put('/api/v1/deliveries/driver/location', data);
+

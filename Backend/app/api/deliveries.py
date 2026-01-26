@@ -12,13 +12,16 @@ from app.services.delivery_service import DeliveryService
 from app.core.database import get_db
 from app.services.auth_service import AuthService
 from app.models.user import User
-from app.models.delivery import Delivery
+from app.models.delivery import Delivery, DeliveryStatus
 from app.models.driver import Driver 
 from pydantic import BaseModel
-
+from datetime import datetime, timedelta, timezone
+ 
 router = APIRouter(tags=["deliveries"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
+print("🔥 deliveries.py LOADED 🔥")
+print("DeliveryStatus members:", list(DeliveryStatus))
 
 # -------------------------
 # AUTH DEPENDENCY
@@ -52,7 +55,8 @@ def attach_assigned_driver(delivery: Delivery) -> DeliveryResponse:
     if delivery.driver:
         assigned_driver = AssignedDriver(
             name=delivery.driver.user.name,
-            vehicle_number=delivery.driver.vehicle_number
+            vehicle_number=delivery.driver.vehicle_number,
+            phone=delivery.driver.user.phone
         )
 
     if delivery.customer:
@@ -60,6 +64,12 @@ def attach_assigned_driver(delivery: Delivery) -> DeliveryResponse:
             "name": delivery.customer.name,
             "phone": delivery.customer.phone
         }
+
+    print(
+        "DEBUG payment status:",
+        delivery.id,
+        delivery.new_payment_status
+    )
 
     return DeliveryResponse(
         id=delivery.id,
@@ -82,7 +92,9 @@ def attach_assigned_driver(delivery: Delivery) -> DeliveryResponse:
         created_at=delivery.created_at,
 
         assigned_driver=assigned_driver,
-        customer=customer_info
+        customer=customer_info,
+        new_payment_status=delivery.new_payment_status,
+
     )
 
 
@@ -125,13 +137,31 @@ def get_my_deliveries(
     current_user: User = Depends(get_current_user_dep),
 ):
     if current_user.user_type == "customer":
-        deliveries = db.query(Delivery).filter(
-            Delivery.customer_id == current_user.id
-        ).all()
+        deliveries = (
+            db.query(Delivery)
+                .filter(
+                    Delivery.customer_id == current_user.id,
+                    (
+                        Delivery.status.in_([
+                            DeliveryStatus.PENDING.value,
+                            DeliveryStatus.ASSIGNED.value,
+                            DeliveryStatus.IN_TRANSIT.value,
+                            # DeliveryStatus.COMPLETED.value
+                        ])
+                    )
+                    |
+                    (
+                        (Delivery.status == DeliveryStatus.COMPLETED.value) &
+                        (Delivery.new_payment_status != "paid")
+                    )
+
+                ).all()
+        )
 
     elif current_user.user_type == "driver":
         deliveries = db.query(Delivery).filter(
-            Delivery.driver_id == current_user.id
+            Delivery.driver_id == current_user.id,
+             Delivery.status != DeliveryStatus.CANCELLED.value
         ).all()
 
     else:
@@ -158,10 +188,11 @@ async def get_unassigned_deliveries(
         db.query(Delivery)
         .filter(
             Delivery.driver_id.is_(None),
-            Delivery.status == "pending"
+            Delivery.status == DeliveryStatus.PENDING.value
         )
         .all()
     )
+
 
     return [attach_assigned_driver(d) for d in deliveries]
 
@@ -191,30 +222,6 @@ async def accept_delivery(
 
 
 # -------------------------
-# CUSTOMER / DRIVER: GET DELIVERY BY ID
-# -------------------------
-@router.get("/{delivery_id}", response_model=DeliveryResponse)
-async def get_delivery(
-    delivery_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dep)
-):
-    delivery = DeliveryService.get_delivery_by_id(
-        db,
-        delivery_id,
-        current_user.id
-    )
-
-    if not delivery:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Delivery not found"
-        )
-
-    return attach_assigned_driver(delivery)
-
-
-# -------------------------
 # DRIVER: START TRIP
 # -------------------------
 @router.post("/{delivery_id}/start", response_model=DeliveryResponse)
@@ -237,6 +244,89 @@ async def start_trip(
 
     return attach_assigned_driver(delivery)
 
+
+@router.get("/completed", response_model=List[DeliveryResponse])
+def get_completed_deliveries(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep)
+):
+    if current_user.user_type != "customer":
+        raise HTTPException(status_code=403, detail="Customers only")
+
+    deliveries = (
+        db.query(Delivery)
+        .filter(
+            Delivery.customer_id == current_user.id,
+            Delivery.status == DeliveryStatus.COMPLETED.value
+        )
+        .all()
+    )
+
+    return [attach_assigned_driver(d) for d in deliveries]
+
+
+@router.get("/driver/completed", response_model=List[DeliveryResponse])
+def get_driver_completed_deliveries(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep),
+):
+    if current_user.user_type != "driver":
+        raise HTTPException(status_code=403, detail="Drivers only")
+
+    deliveries = (
+        db.query(Delivery)
+        .filter(
+            Delivery.driver_id == current_user.id,
+            Delivery.status == DeliveryStatus.COMPLETED.value
+        )
+        .order_by(Delivery.actual_delivery.desc())
+        .all()
+    )
+
+    return [attach_assigned_driver(d) for d in deliveries]
+
+# -------------------------
+# CUSTOMER / DRIVER: GET DELIVERY BY ID
+# -------------------------
+@router.get("/{delivery_id}", response_model=DeliveryResponse)
+async def get_delivery(
+    delivery_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep)
+):
+    delivery = DeliveryService.get_delivery_by_id(
+        db,
+        delivery_id,
+        current_user.id
+    )
+
+    if not delivery:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Delivery not found"
+        )
+
+    return attach_assigned_driver(delivery)
+
+# @router.get("/completed-unpaid", response_model=List[DeliveryResponse])
+# def completed_unpaid_deliveries(
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user_dep)
+# ):
+#     return (
+#         db.query(Delivery)
+#         .filter(
+#             Delivery.customer_id == current_user.id,
+#             Delivery.status == DeliveryStatus.COMPLETED.value,
+#             Delivery.new_payment_status != "paid"
+#         )
+#         .all()
+#     )
+
+
+# -------------------------
+# DRIVER: START TRIP
+# -------------------------
 
 # -------------------------
 # DRIVER: COMPLETE TRIP
@@ -328,11 +418,12 @@ async def get_driver_location(
             db.query(Delivery)
             .filter(
                 Delivery.customer_id == current_user.id,
-                Delivery.status != "completed",
+                Delivery.status != DeliveryStatus.COMPLETED.value,
                 Delivery.driver_id.isnot(None)
             )
             .first()
         )
+
 
         if not delivery:
             return {"lat": None, "lng": None}
@@ -361,3 +452,202 @@ async def get_driver_location(
         "lat": driver.current_location_lat,
         "lng": driver.current_location_lng
     }
+
+# @router.post("/{delivery_id}/cancel", response_model=DeliveryResponse)
+# async def cancel_delivery(
+#     delivery_id: str,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user_dep)
+# ):
+#     """
+#     Driver can cancel ONLY if:
+#     - Status = assigned
+#     - Scheduled pickup is > 15 minutes away
+#     """
+
+#     if current_user.user_type != "driver":
+#         raise HTTPException(status_code=403, detail="Drivers only")
+
+#     delivery = db.query(Delivery).filter(Delivery.id == delivery_id).first()
+
+#     if not delivery:
+#         raise HTTPException(status_code=404, detail="Delivery not found")
+
+#     # Only assigned deliveries can be cancelled
+#     if delivery.status != "assigned":
+#         raise HTTPException(
+#             status_code=400,
+#             detail="Only assigned deliveries can be cancelled"
+#         )
+
+#     # Time rule: must be > 15 minutes before pickup
+#     if delivery.scheduled_pickup:
+#         now = datetime.utcnow()
+#         if delivery.scheduled_pickup - now <= timedelta(minutes=15):
+#             raise HTTPException(
+#                 status_code=400,
+#                 detail="Cannot cancel within 15 minutes of pickup"
+#             )
+
+#     # Reset delivery
+#     delivery.status = "pending"
+#     delivery.driver_id = None
+
+#     db.commit()
+#     db.refresh(delivery)
+
+#     return attach_assigned_driver(delivery)
+
+@router.post("/{delivery_id}/driver-cancel", response_model=DeliveryResponse)
+async def driver_cancel_delivery(
+    delivery_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep)
+):
+    if current_user.user_type != "driver":
+        raise HTTPException(status_code=403, detail="Drivers only")
+
+    delivery = db.query(Delivery).filter(Delivery.id == delivery_id).first()
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+
+    if delivery.status == DeliveryStatus.COMPLETED.value:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot cancel a completed delivery"
+        )
+
+    now = datetime.utcnow()
+    fine = 0
+
+    # 🚨 Fine conditions
+    if delivery.status == DeliveryStatus.IN_TRANSIT.value:
+        fine = 100
+
+    elif delivery.scheduled_pickup:
+        diff_minutes = (delivery.scheduled_pickup - now).total_seconds() / 60
+        if diff_minutes <= 5:
+            fine = 100
+
+    # Apply cancellation
+    delivery.status = DeliveryStatus.PENDING.value
+    delivery.driver_id = None
+
+    # Optional: store fine
+    # delivery.driver_penalty = fine
+
+    db.commit()
+    db.refresh(delivery)
+
+    return {
+        **attach_assigned_driver(delivery).dict(),
+        "fine": fine
+    }
+
+
+@router.post("/{delivery_id}/customer-cancel", response_model=DeliveryResponse)
+async def customer_cancel_delivery(
+    delivery_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep)
+):
+    delivery = db.query(Delivery).filter(Delivery.id == delivery_id).first()
+
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+
+    if current_user.user_type == "customer":
+        if delivery.customer_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not allowed")
+
+    if delivery.status == DeliveryStatus.COMPLETED.value:
+        raise HTTPException(status_code=400, detail="Cannot cancel completed delivery")
+
+    delivery.status = DeliveryStatus.CANCELLED.value
+    delivery.driver_id = None
+
+    db.commit()
+    db.refresh(delivery)
+
+    return attach_assigned_driver(delivery)
+
+@router.post("/{delivery_id}/mark-paid", response_model=DeliveryResponse)
+async def mark_delivery_paid(
+    delivery_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep),
+):
+    delivery = db.query(Delivery).filter(Delivery.id == delivery_id).first()
+
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+
+    if current_user.user_type != "customer" or delivery.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    if delivery.status != DeliveryStatus.COMPLETED.value:
+        raise HTTPException(status_code=400, detail="Delivery not completed")
+
+    delivery.new_payment_status = "paid"   # ✅ THIS IS THE KEY
+    db.commit()
+    db.refresh(delivery)
+
+    return attach_assigned_driver(delivery)
+
+
+
+class ReschedulePickup(BaseModel):
+    scheduled_pickup: datetime
+
+
+
+
+@router.patch("/{delivery_id}", response_model=DeliveryResponse)
+async def reschedule_pickup(
+    delivery_id: str,
+    payload: ReschedulePickup,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep),
+):
+    delivery = db.query(Delivery).filter(Delivery.id == delivery_id).first()
+
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+
+    # Only customer can reschedule
+    if current_user.user_type != "customer" or delivery.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    # Cannot reschedule completed / cancelled
+    if delivery.status in (
+        DeliveryStatus.COMPLETED.value,
+        DeliveryStatus.CANCELLED.value,
+    ):
+        raise HTTPException(status_code=400, detail="Cannot reschedule this delivery")
+
+    # ───────────────────────────────
+    # 🔐 SAFE DATETIME HANDLING
+    # ───────────────────────────────
+    incoming = payload.scheduled_pickup
+
+    # If frontend sent datetime-local (naive), assume UTC
+    if incoming.tzinfo is None:
+        incoming = incoming.replace(tzinfo=timezone.utc)
+
+    now = datetime.now(timezone.utc)
+
+    if incoming <= now:
+        raise HTTPException(
+            status_code=400,
+            detail="Pickup time must be in the future"
+        )
+
+    # Store as UTC-aware
+    delivery.scheduled_pickup = incoming
+
+    db.commit()
+    db.refresh(delivery)
+
+    return attach_assigned_driver(delivery)
+
+

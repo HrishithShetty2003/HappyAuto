@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { getMe } from '../services/api';
 
@@ -9,14 +10,26 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
+    const storedUser = localStorage.getItem('user');
+
+    // 1️⃣ Restore user immediately (fast UI)
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+
+    // 2️⃣ Validate token with backend
     if (token) {
-      getMe().then((res) => {
-        setUser(res.data); // Note: Backend returns {id, name...} inside response
-        setLoading(false);
-      }).catch(() => {
-        localStorage.removeItem('access_token');
-        setLoading(false);
-      });
+      getMe()
+        .then((res) => {
+          setUser(res.data);
+          localStorage.setItem('user', JSON.stringify(res.data)); // ✅ persist
+        })
+        .catch(() => {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('user');
+          setUser(null);
+        })
+        .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }

@@ -8,7 +8,8 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    localStorage.removeItem('a_token');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
     setUser(null);
     navigate('/');
   };
@@ -29,13 +30,13 @@ const Navbar = () => {
           <div className="flex items-center space-x-2 sm:space-x-4">
             {user ? (
               <>
-              <Link to="/login" className="text-slate-600 hover:text-amber-600 font-medium text-sm">Log In</Link>
-              <Link to="/register/customer" className="text-amber-600 font-medium text-sm px-2 hover:underline hidden sm:inline">
+              {/* <Link to="/login" className="text-slate-600 hover:text-amber-600 font-medium text-sm">Log In</Link> */}
+              {/* <Link to="/register/customer" className="text-amber-600 font-medium text-sm px-2 hover:underline hidden sm:inline">
                   Customer
                 </Link>
                 <Link to="/register/driver" className="text-slate-900 font-medium text-sm px-2 hover:text-amber-600 hidden sm:inline">
                   Driver
-                </Link>
+                </Link> */}
                 <Link to="/register/customer" className="sm:hidden bg-amber-500 text-white px-4 py-2 rounded-lg font-medium">
                   Register
                 </Link>
@@ -50,10 +51,29 @@ const Navbar = () => {
                 </div>
 
                 {user.user_type === 'driver' && (
-                   <Link to="/driver-dashboard" className="text-slate-600 hover:text-amber-600 font-medium text-sm px-3 py-2 transition-colors">Dashboard</Link>
+                  <>
+                    <Link to="/driver-dashboard" className="text-slate-600 hover:text-amber-600 font-medium text-sm px-3 py-2 transition-colors">Dashboard</Link>
+                    <Link
+                      to="/driver-summary"
+                      className="text-slate-600 hover:text-amber-600 font-medium text-sm px-3 py-2 transition-colors"
+                  >
+                    Summary
+                  </Link>
+                  </>
                 )}
                 {user.user_type === 'customer' && (
-                   <Link to="/customer-dashboard" className="text-slate-600 hover:text-amber-600 font-medium text-sm px-3 py-2 transition-colors">Dashboard</Link>
+                  <>
+                    <Link 
+                      to="/customer-dashboard" className="text-slate-600 hover:text-amber-600 font-medium text-sm px-3 py-2 transition-colors">
+                        Dashboard
+                    </Link>
+                    <Link
+                      to="/customer-summary"
+                      className="text-slate-600 hover:text-amber-600 font-medium text-sm px-3 py-2 transition-colors"
+                    >
+                      Summary
+                    </Link>
+                  </>
                 )}
                 
                 <button onClick={handleLogout} className="ml-2 text-rose-500 hover:bg-rose-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors">

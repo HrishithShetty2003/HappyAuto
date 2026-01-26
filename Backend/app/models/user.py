@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 from app.core.database import Base
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 class User(Base):
     __tablename__ = "users"
@@ -16,7 +17,11 @@ class User(Base):
     user_type = Column(String(20), nullable=False)  # "driver", "customer", "admin"
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     address = Column(String, nullable=True)
     city = Column(String, nullable=True)

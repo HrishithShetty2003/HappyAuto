@@ -7,7 +7,7 @@ from app.models.customer import Customer
 from app.services.ai_service import AIService
 from typing import Tuple, Dict, Optional 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import update
 import json
 
@@ -58,7 +58,7 @@ class DeliveryService:
             # 4. Calculate estimated cost
             base_rate = 50  # ₹50 base
             distance_rate = 15  # ₹15 per km
-            estimated_cost = base_rate + (route_info['distance_km'] * distance_rate)
+            estimated_cost = round(base_rate + (route_info['distance_km'] * distance_rate),2)
             vin = delivery_data.get("vehicle_vin")
             if vin in ("TBD", "", None):
                 vin = None
@@ -172,6 +172,7 @@ class DeliveryService:
 
         return delivery, None
     
+
     @staticmethod
     def start_trip(db, delivery_id: str, driver_id: str):
         delivery = db.query(Delivery).filter(
@@ -182,10 +183,11 @@ class DeliveryService:
         if not delivery:
             return None, "Delivery not found or not assigned to you"
 
-        if delivery.status != "assigned":
+        if delivery.status != DeliveryStatus.ASSIGNED.value:
             return None, "Trip cannot be started"
 
-        delivery.status = "in_transit"
+        # ✅ NO TIME CHECK
+        delivery.status = DeliveryStatus.IN_TRANSIT.value
         delivery.actual_pickup = datetime.utcnow()
 
         db.commit()
@@ -208,7 +210,7 @@ class DeliveryService:
         if delivery.status != "in_transit":
             return None, f"Trip cannot be completed (current status: {delivery.status})"
 
-        delivery.status = "completed"
+        delivery.status = DeliveryStatus.COMPLETED.value
         delivery.actual_delivery = datetime.utcnow()
 
         db.commit()

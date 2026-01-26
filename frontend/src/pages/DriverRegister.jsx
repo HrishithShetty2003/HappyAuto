@@ -3,7 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { register } from '../services/api';
 
+
+
 const DriverRegister = () => {
+  const [formError, setFormError] = useState("");
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', password: '', 
     driver_license_number: '', vehicle_plate_number: ''
@@ -19,6 +22,12 @@ const DriverRegister = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!formData.driver_license_number || !formData.vehicle_plate_number) {
+      setFormError("Please enter your license number and vehicle plate number to register as a driver.");
+      return;
+    }
+
     try {
       // Explicitly set user_type to 'driver'
       const res = await register({ 
@@ -26,14 +35,16 @@ const DriverRegister = () => {
         user_type: 'driver' 
       });
       
-      localStorage.setItem('aceess_token', res.data.access_token);
+      localStorage.setItem('access_token', res.data.access_token);
       const userRes = await import('../services/api').then(mod => mod.getMe());
       setUser(userRes.data);
       navigate('/driver-dashboard');
       
     } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.detail || 'Registration failed');
+      setFormError(
+        err.response?.data?.detail ||
+        "Registration failed. Please try again."
+      );
     }
   };
 
@@ -65,9 +76,9 @@ const DriverRegister = () => {
           </div>
 
           <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
-            {error && (
-              <div className="mb-6 bg-rose-50 text-rose-600 p-4 rounded-xl text-sm font-medium flex items-center gap-2">
-                <span>⚠️</span> {error}
+            {formError && (
+              <div className="mb-6 bg-rose-50 text-rose-700 p-4 rounded-xl text-sm font-medium flex items-center gap-2 border border-rose-200">
+                ⚠️ {formError}
               </div>
             )}
             

@@ -16,6 +16,7 @@ class Settings:
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
+    
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./happyauto.db")
     
